@@ -1,0 +1,49 @@
+name: Docker CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t first-app:test .
+
+      - name: Run container
+        run: docker run -d --name first-app-test -p 8000:8000 first-app:test
+
+      - name: Test health endpoint
+        run: |
+          for i in $(seq 1 15); do
+            if curl --fail http://localhost:8000/health; then
+              echo "Health check passed"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs first-app-test
+          exit 1
+
+      - name: Test home endpoint
+        run: curl --fail http://localhost:8000/
+
+      - name: Clean up container
+        if: always()
+        run: docker rm -f first-app-test || true
